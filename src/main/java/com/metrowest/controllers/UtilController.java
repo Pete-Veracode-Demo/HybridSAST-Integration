@@ -3,6 +3,7 @@ package com.metrowest.controllers;
 import com.metrowest.entity.Order;
 import com.metrowest.entity.OrderStatus;
 import com.metrowest.repo.OrderRepository;
+import com.metrowest.repo.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.intellij.lang.annotations.Language;
@@ -12,6 +13,7 @@ import org.springframework.expression.Expression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -30,10 +32,12 @@ public class UtilController
 {
     private static final SpelExpressionParser PARSER = new SpelExpressionParser();
     private final OrderRepository orderRepository;
+    private final UserRepository userRepository;
 
-    public UtilController(OrderRepository orderRepository)
+    public UtilController(OrderRepository orderRepository, UserRepository userRepository)
     {
         this.orderRepository = orderRepository;
+        this.userRepository = userRepository;
     }
 
     private void consume_object(Object builder)
@@ -94,13 +98,26 @@ public class UtilController
     }
 
     @GetMapping("/order/details")
-    public ResponseEntity<?> getOrderDetails(@RequestParam Long orderId)
+    public ResponseEntity<?> getOrderDetails(@RequestParam Long orderId, Authentication authentication)
     {
+        // Get the authenticated user
+        var currentUser = userRepository.findByUsername(authentication.getName()).orElse(null);
+        if (currentUser == null)
+        {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+
         var order = orderRepository.findById(orderId).orElse(null);
 
         if (order == null)
         {
             return ResponseEntity.notFound().build();
+        }
+
+        // Authorization check: verify the order belongs to the authenticated user
+        if (!order.getCustomer().getId().equals(currentUser.getId()))
+        {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
         }
 
         Map<String, Object> response = new HashMap<>();
@@ -114,13 +131,26 @@ public class UtilController
     }
 
     @PostMapping("/order/cancel")
-    public ResponseEntity<?> cancelOrder(@RequestParam Long orderId)
+    public ResponseEntity<?> cancelOrder(@RequestParam Long orderId, Authentication authentication)
     {
+        // Get the authenticated user
+        var currentUser = userRepository.findByUsername(authentication.getName()).orElse(null);
+        if (currentUser == null)
+        {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+
         var order = orderRepository.findById(orderId).orElse(null);
 
         if (order == null)
         {
             return ResponseEntity.notFound().build();
+        }
+
+        // Authorization check: verify the order belongs to the authenticated user
+        if (!order.getCustomer().getId().equals(currentUser.getId()))
+        {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
         }
 
         order.setStatus(OrderStatus.CANCELLED);
