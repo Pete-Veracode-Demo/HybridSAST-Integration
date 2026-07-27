@@ -6,4 +6,5 @@ public enum OrderStatus
     OPEN,
     PENDING,
     CLOSED,
+    CANCELLED,
 }

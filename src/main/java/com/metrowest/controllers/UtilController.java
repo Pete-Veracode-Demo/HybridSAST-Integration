@@ -1,5 +1,9 @@
 package com.metrowest.controllers;
 
+import com.metrowest.entity.Order;
+import com.metrowest.entity.OrderStatus;
+import com.metrowest.repo.OrderRepository;
+import com.metrowest.repo.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.intellij.lang.annotations.Language;
@@ -8,6 +12,8 @@ import org.springframework.data.javapoet.LordOfTheStrings;
 import org.springframework.expression.Expression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,12 +23,22 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/utils")
 public class UtilController
 {
     private static final SpelExpressionParser PARSER = new SpelExpressionParser();
+    private final OrderRepository orderRepository;
+    private final UserRepository userRepository;
+
+    public UtilController(OrderRepository orderRepository, UserRepository userRepository)
+    {
+        this.orderRepository = orderRepository;
+        this.userRepository = userRepository;
+    }
 
     private void consume_object(Object builder)
     {
@@ -79,5 +95,133 @@ public class UtilController
         var builder = LordOfTheStrings.invoke(format, (Object[]) args);
         consume_object(builder);
         return "lord_invoke_builder endpoint executed";
+    }
+
+    @GetMapping("/order/details")
+    public ResponseEntity<?> getOrderDetails(@RequestParam Long orderId, Authentication authentication)
+    {
+        // Get the authenticated user
+        var currentUser = userRepository.findByUsername(authentication.getName()).orElse(null);
+        if (currentUser == null)
+        {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+
+        var order = orderRepository.findById(orderId).orElse(null);
+
+        if (order == null)
+        {
+            return ResponseEntity.notFound().build();
+        }
+
+        // Authorization check: verify the order belongs to the authenticated user
+        if (!order.getCustomer().getId().equals(currentUser.getId()))
+        {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("orderId", order.getId());
+        response.put("status", order.getStatus().toString());
+        response.put("customer", order.getCustomer().getUsername());
+        response.put("customerId", order.getCustomer().getId());
+        response.put("itemCount", order.getItems().size());
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/order/cancel")
+    public ResponseEntity<?> cancelOrder(@RequestParam Long orderId, Authentication authentication)
+    {
+        // Get the authenticated user
+        var currentUser = userRepository.findByUsername(authentication.getName()).orElse(null);
+        if (currentUser == null)
+        {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+
+        var order = orderRepository.findById(orderId).orElse(null);
+
+        if (order == null)
+        {
+            return ResponseEntity.notFound().build();
+        }
+
+        // Authorization check: verify the order belongs to the authenticated user
+        if (!order.getCustomer().getId().equals(currentUser.getId()))
+        {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
+        orderRepository.save(order);
+
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "Order " + orderId + " cancelled successfully");
+        response.put("status", "CANCELLED");
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/user/profile")
+    public ResponseEntity<?> getUserProfile(@RequestParam Long userId, Authentication authentication)
+    {
+        // Get the authenticated user
+        var currentUser = userRepository.findByUsername(authentication.getName()).orElse(null);
+        if (currentUser == null)
+        {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+
+        var user = userRepository.findById(userId).orElse(null);
+
+        if (user == null)
+        {
+            return ResponseEntity.notFound().build();
+        }
+
+        // Authorization check: verify the user is accessing their own profile
+        if (!user.getId().equals(currentUser.getId()))
+        {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("userId", user.getId());
+        response.put("username", user.getUsername());
+        response.put("email", user.getEmail());
+        response.put("role", user.getRole().name());
+        response.put("createdAt", user.getCreatedAt());
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/user/orders")
+    public ResponseEntity<?> getUserOrders(@RequestParam Long customerId)
+    {
+        var user = userRepository.findById(customerId).orElse(null);
+
+        if (user == null)
+        {
+            return ResponseEntity.notFound().build();
+        }
+
+        var orders = orderRepository.findAll().stream()
+                .filter(order -> order.getCustomer().getId().equals(customerId))
+                .map(order -> {
+                    Map<String, Object> orderData = new HashMap<>();
+                    orderData.put("orderId", order.getId());
+                    orderData.put("status", order.getStatus().toString());
+                    orderData.put("itemCount", order.getItems().size());
+                    return orderData;
+                })
+                .toList();
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("customerId", customerId);
+        response.put("customerName", user.getUsername());
+        response.put("orders", orders);
+
+        return ResponseEntity.ok(response);
     }
 }
