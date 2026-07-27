@@ -162,4 +162,58 @@ public class UtilController
 
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/user/profile")
+    public ResponseEntity<?> getUserProfile(@RequestParam Long userId, Authentication authentication)
+    {
+        if (authentication == null || !authentication.isAuthenticated())
+        {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+
+        var user = userRepository.findById(userId).orElse(null);
+
+        if (user == null)
+        {
+            return ResponseEntity.notFound().build();
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("userId", user.getId());
+        response.put("username", user.getUsername());
+        response.put("email", user.getEmail());
+        response.put("role", user.getRole().name());
+        response.put("createdAt", user.getCreatedAt());
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/user/orders")
+    public ResponseEntity<?> getUserOrders(@RequestParam Long customerId)
+    {
+        var user = userRepository.findById(customerId).orElse(null);
+
+        if (user == null)
+        {
+            return ResponseEntity.notFound().build();
+        }
+
+        var orders = orderRepository.findAll().stream()
+                .filter(order -> order.getCustomer().getId().equals(customerId))
+                .map(order -> {
+                    Map<String, Object> orderData = new HashMap<>();
+                    orderData.put("orderId", order.getId());
+                    orderData.put("status", order.getStatus().toString());
+                    orderData.put("itemCount", order.getItems().size());
+                    return orderData;
+                })
+                .toList();
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("customerId", customerId);
+        response.put("customerName", user.getUsername());
+        response.put("orders", orders);
+
+        return ResponseEntity.ok(response);
+    }
 }
