@@ -166,7 +166,9 @@ public class UtilController
     @GetMapping("/user/profile")
     public ResponseEntity<?> getUserProfile(@RequestParam Long userId, Authentication authentication)
     {
-        if (authentication == null || !authentication.isAuthenticated())
+        // Get the authenticated user
+        var currentUser = userRepository.findByUsername(authentication.getName()).orElse(null);
+        if (currentUser == null)
         {
             return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
         }
@@ -176,6 +178,12 @@ public class UtilController
         if (user == null)
         {
             return ResponseEntity.notFound().build();
+        }
+
+        // Authorization check: verify the user is accessing their own profile
+        if (!user.getId().equals(currentUser.getId()))
+        {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
         }
 
         Map<String, Object> response = new HashMap<>();
