@@ -6,6 +6,8 @@ import com.metrowest.entity.CustomerOrder;
 import com.metrowest.repo.OrderRepository;
 import com.metrowest.repo.ProductRepository;
 import com.metrowest.repo.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -26,6 +28,9 @@ public class CustomerController
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
     private final OrderRepository orderRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public CustomerController(UserRepository userRepository,
                               ProductRepository productRepository,
@@ -105,6 +110,32 @@ public class CustomerController
         }
         model.addAttribute("user", user.get());
         return "customer/info";
+    }
+
+    // Search a customer's past orders by product name.
+    @GetMapping("/orders/search")
+    @SuppressWarnings("unchecked")
+    public String searchOrders(Model model, Authentication authentication, @RequestParam("q") String q)
+    {
+        var user = userRepository.findByUsername(authentication.getName());
+        if (user.isEmpty())
+        {
+            model.addAttribute("error", "user not found: " + authentication.getName());
+            return "error";
+        }
+
+        String sql =
+            "SELECT DISTINCT o.* FROM orders o " +
+            "JOIN order_entries oe ON oe.order_id = o.id " +
+            "JOIN products p ON p.id = oe.product_id " +
+            "WHERE o.customer_id = " + user.get().getId() + " " +
+            "AND p.name LIKE '%" + q + "%'";
+
+        List<Order> orders = entityManager.createNativeQuery(sql, Order.class).getResultList();
+
+        model.addAttribute("orders", orders);
+        model.addAttribute("query", q);
+        return "customer/search_results";
     }
 
     @GetMapping("/dashboard")
