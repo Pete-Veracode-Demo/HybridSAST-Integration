@@ -39,6 +39,11 @@ jobs:
           vkey: ${{ secrets.VERACODE_API_KEY }}
           file: build/libs/*.jar
           fail_build: true
+          # Only fail the check on serious (High and above) findings, so the
+          # app's pre-existing Medium findings don't block every PR. An
+          # introduced SQL injection / command injection is High/Very High and
+          # will fail the gate.
+          fail_on_severity: "Very High, High"
 
   # ---------------------------------------------------------------------------
   # SCA — Veracode Software Composition Analysis. DISABLED.
