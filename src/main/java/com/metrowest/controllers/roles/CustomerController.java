@@ -11,6 +11,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -94,6 +95,11 @@ public class CustomerController
         return "success";
     }
 
+    // VULNERABLE (IDOR / CWE-639): userID comes straight from the request and is
+    // used to look up any user, with no check that it belongs to the authenticated
+    // caller. Any authenticated customer can enumerate userID=1,2,3... and read
+    // other users' profiles. Secure version would scope the lookup to the current
+    // principal (e.g. userRepository.findByUsername(authentication.getName())).
     @PostMapping("/info")
     public String info(Model model, @RequestParam("userID") Long userID)
     {
@@ -105,6 +111,26 @@ public class CustomerController
         }
         model.addAttribute("user", user.get());
         return "customer/info";
+    }
+
+    // VULNERABLE (IDOR / CWE-639): the order id is taken from the URL path and the
+    // order is loaded directly, without verifying it belongs to the authenticated
+    // customer. Any logged-in customer can request /customer/order/{id} for an
+    // arbitrary id and view another customer's order, its line items and pricing.
+    // Secure version would scope the lookup to the caller, e.g.
+    //   orderRepository.findByIdAndCustomer(id, currentUser)
+    @GetMapping("/order/{id}")
+    public String viewOrder(Model model, Authentication authentication, @PathVariable("id") Long id)
+    {
+        var order = orderRepository.findById(id);
+        if (order.isEmpty())
+        {
+            model.addAttribute("error", "order not found: " + id);
+            return "error";
+        }
+        // NOTE: no ownership check against authentication.getName() -> IDOR
+        model.addAttribute("order", order.get());
+        return "customer/order";
     }
 
     @GetMapping("/dashboard")

@@ -58,3 +58,23 @@ Example Endpoints
 - `/users` - lists all users
 - `/users/new` - presents a UI for adding new users
 - `/logs` - access internal logging messages for auditing purposes
+---
+
+## Known Vulnerabilities (intentional — for SAST/Veracode demo)
+
+This is a deliberately vulnerable demo app. The following issues are planted so
+static analysis has real findings to detect. **Do not deploy this application.**
+
+### Insecure Direct Object Reference (IDOR / CWE-639, OWASP A01: Broken Access Control)
+
+- `POST /customer/info` (`CustomerController#info`) — takes a `userID` request
+  parameter and returns that user's profile with no check that it belongs to the
+  authenticated caller. Any authenticated customer can enumerate ids to read other
+  users' profiles.
+- `GET /customer/order/{id}` (`CustomerController#viewOrder`) — loads an order by
+  its path id without verifying ownership, exposing another customer's order,
+  line items, and pricing.
+
+Secure remediation in both cases is to scope the lookup to the authenticated
+principal (e.g. `findByIdAndCustomer(id, currentUser)`) rather than trusting the
+client-supplied identifier.
