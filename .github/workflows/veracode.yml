@@ -1,0 +1,83 @@
+name: Veracode Security Scan
+
+# Demo flow: opening a PR (e.g. one that introduces an IDOR) kicks off a
+# Veracode scan. Only the SAST (Static Analysis) pipeline scan runs here.
+# The Secrets and SCA scans are intentionally DISABLED for this demo.
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # SAST — Veracode Static Analysis (Pipeline Scan). ENABLED.
+  # ---------------------------------------------------------------------------
+  sast:
+    name: Veracode SAST (Pipeline Scan)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Build application artifact
+        run: |
+          chmod +x ./gradlew
+          ./gradlew bootJar --no-daemon
+
+      - name: Run Veracode Static Analysis Pipeline Scan
+        uses: veracode/Veracode-pipeline-scan-action@v1.0.16
+        with:
+          vid: ${{ secrets.VERACODE_API_ID }}
+          vkey: ${{ secrets.VERACODE_API_KEY }}
+          file: build/libs/*.jar
+          fail_build: false
+
+  # ---------------------------------------------------------------------------
+  # SCA — Veracode Software Composition Analysis. DISABLED for this demo.
+  # Re-enable by changing `if: false` to `if: true` (or removing the guard).
+  # ---------------------------------------------------------------------------
+  sca:
+    name: Veracode SCA
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Veracode SCA (Agent-Based) scan
+        uses: veracode/veracode-sca@v1
+        env:
+          SRCCLR_API_TOKEN: ${{ secrets.SRCCLR_API_TOKEN }}
+        with:
+          create-issues: false
+
+  # ---------------------------------------------------------------------------
+  # Secrets — Veracode secrets scanning. DISABLED for this demo.
+  # Re-enable by changing `if: false` to `if: true` (or removing the guard).
+  # ---------------------------------------------------------------------------
+  secrets:
+    name: Veracode Secrets Scan
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Veracode CLI
+        run: |
+          curl -fsS https://tools.veracode.com/veracode-cli/install | sh
+
+      - name: Run Veracode secrets scan
+        env:
+          VERACODE_API_KEY_ID: ${{ secrets.VERACODE_API_ID }}
+          VERACODE_API_KEY_SECRET: ${{ secrets.VERACODE_API_KEY }}
+        run: |
+          ./veracode scan --type directory --source . --scan-type secrets
