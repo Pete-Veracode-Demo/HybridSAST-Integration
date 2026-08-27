@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang='en'>
+<head>
+    <title>MetroWest HVAC Systems, Inc.</title>
+</head>
+<body>
+<h1>Order search</h1>
+<p>Results for: <span th:text="${query}"></span></p>
+
+<table>
+    <thead>
+    <tr>
+        <th>Order ID</th>
+        <th>Status</th>
+        <th>Details</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="order : ${orders}">
+        <td th:text="${order.id}"></td>
+        <td th:text="${order.status}"></td>
+        <td><a th:href="@{'/customer/order/' + ${order.id}}">view</a></td>
+    </tr>
+    </tbody>
+</table>
+
+<div th:if="${orders != null and orders.isEmpty()}">
+    <p>No matching orders.</p>
+</div>
+</body>
+</html>

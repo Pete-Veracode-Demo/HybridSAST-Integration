@@ -6,11 +6,14 @@ import com.metrowest.entity.CustomerOrder;
 import com.metrowest.repo.OrderRepository;
 import com.metrowest.repo.ProductRepository;
 import com.metrowest.repo.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -26,6 +29,9 @@ public class CustomerController
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
     private final OrderRepository orderRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public CustomerController(UserRepository userRepository,
                               ProductRepository productRepository,
@@ -105,6 +111,48 @@ public class CustomerController
         }
         model.addAttribute("user", user.get());
         return "customer/info";
+    }
+
+    // Search a customer's past orders by product name.
+    @GetMapping("/orders/search")
+    @SuppressWarnings("unchecked")
+    public String searchOrders(Model model, Authentication authentication, @RequestParam("q") String q)
+    {
+        var user = userRepository.findByUsername(authentication.getName());
+        if (user.isEmpty())
+        {
+            model.addAttribute("error", "user not found: " + authentication.getName());
+            return "error";
+        }
+
+        // Build a native query that returns the orders of the current customer
+        // whose line items include a product matching the search term.
+        String sql =
+            "SELECT DISTINCT o.* FROM orders o " +
+            "JOIN order_entries oe ON oe.order_id = o.id " +
+            "JOIN products p ON p.id = oe.product_id " +
+            "WHERE o.customer_id = " + user.get().getId() + " " +
+            "AND p.name LIKE '%" + q + "%'";
+
+        List<Order> orders = entityManager.createNativeQuery(sql, Order.class).getResultList();
+
+        model.addAttribute("orders", orders);
+        model.addAttribute("query", q);
+        return "customer/search_results";
+    }
+
+    // Show the details of a single order.
+    @GetMapping("/order/{id}")
+    public String viewOrder(Model model, Authentication authentication, @PathVariable("id") Long id)
+    {
+        var order = orderRepository.findById(id);
+        if (order.isEmpty())
+        {
+            model.addAttribute("error", "order not found: " + id);
+            return "error";
+        }
+        model.addAttribute("order", order.get());
+        return "customer/order";
     }
 
     @GetMapping("/dashboard")

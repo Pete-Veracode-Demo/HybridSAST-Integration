@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang='en'>
+<head>
+    <title>MetroWest HVAC Systems, Inc.</title>
+</head>
+<body>
+<h1>Order details</h1>
+<div th:if="${order}">
+    <div>
+        <span>Order ID:</span><span th:text="${order.id}"></span>
+    </div>
+    <div>
+        <span>Customer:</span><span th:text="${order.customer?.username}"></span>
+    </div>
+    <div>
+        <span>Status:</span><span th:text="${order.status}"></span>
+    </div>
+
+    <h2>Items</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>Product</th>
+            <th>Quantity</th>
+            <th>Unit price</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="item : ${order.items}">
+            <td th:text="${item.product?.name}"></td>
+            <td th:text="${item.quantity}"></td>
+            <td th:text="${item.unitPrice}"></td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>
