@@ -32,21 +32,29 @@ jobs:
           chmod +x ./gradlew
           ./gradlew bootJar --no-daemon
 
+      # Call the Veracode pipeline scanner JAR directly rather than via
+      # veracode/Veracode-pipeline-scan-action: that action mishandles the
+      # fail_on_severity value (it splits "Very High, High" on spaces and the
+      # scan crashes) and ignores fail_on_cwe. Invoking the JAR ourselves lets
+      # us pass -fs "Very High, High" correctly, so the app's pre-existing
+      # Medium findings don't fail the gate but an introduced High/Very High
+      # vuln (e.g. SQL injection, command injection) does. The scanner exits
+      # non-zero when a finding meets the fail criteria, which fails the job.
       - name: Run Veracode Static Analysis Pipeline Scan
-        uses: veracode/Veracode-pipeline-scan-action@v1.0.16
-        with:
-          vid: ${{ secrets.VERACODE_API_ID }}
-          vkey: ${{ secrets.VERACODE_API_KEY }}
-          file: build/libs/*.jar
-          fail_build: true
-          # Fail the check on serious injection / critical CWE classes, so the
-          # app's pre-existing baseline findings (CWE-80 basic XSS, CWE-798
-          # hard-coded credentials) don't block every PR, while an introduced
-          # SQL injection (89), command injection (78), path traversal (22),
-          # etc. fails the gate. Comma-separated with no spaces (this action
-          # splits multi-word severity values on spaces, so fail_on_severity
-          # is avoided).
-          fail_on_cwe: "78,89,90,22,94,434,502,611,643,943"
+        env:
+          VERACODE_API_ID: ${{ secrets.VERACODE_API_ID }}
+          VERACODE_API_KEY: ${{ secrets.VERACODE_API_KEY }}
+        run: |
+          set -euo pipefail
+          curl -fsSO https://downloads.veracode.com/securityscan/pipeline-scan-LATEST.zip
+          unzip -o pipeline-scan-LATEST.zip pipeline-scan.jar
+          JAR="$(ls build/libs/*.jar | head -n1)"
+          echo "Scanning artifact: $JAR"
+          java -jar pipeline-scan.jar \
+            -vid "$VERACODE_API_ID" \
+            -vkey "$VERACODE_API_KEY" \
+            -f "$JAR" \
+            -fs "Very High, High"
 
   # ---------------------------------------------------------------------------
   # SCA — Veracode Software Composition Analysis. DISABLED.
