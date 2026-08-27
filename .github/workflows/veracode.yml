@@ -49,10 +49,14 @@ jobs:
           curl -fsSO https://downloads.veracode.com/securityscan/pipeline-scan-LATEST.zip
           unzip -o pipeline-scan-LATEST.zip pipeline-scan.jar
           JAR="$(ls build/libs/*.jar | head -n1)"
+          # Strip any surrounding whitespace/newline the stored secret may carry
+          # (the API id must be exactly 32 chars).
+          VID="$(printf '%s' "$VERACODE_API_ID" | tr -d '[:space:]')"
+          VKEY="$(printf '%s' "$VERACODE_API_KEY" | tr -d '[:space:]')"
           echo "Scanning artifact: $JAR"
           java -jar pipeline-scan.jar \
-            -vid "$VERACODE_API_ID" \
-            -vkey "$VERACODE_API_KEY" \
+            -vid "$VID" \
+            -vkey "$VKEY" \
             -f "$JAR" \
             -fs "Very High, High"
 
