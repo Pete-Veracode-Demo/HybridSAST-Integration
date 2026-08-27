@@ -6,11 +6,14 @@ import com.metrowest.entity.CustomerOrder;
 import com.metrowest.repo.OrderRepository;
 import com.metrowest.repo.ProductRepository;
 import com.metrowest.repo.UserRepository;
+import com.metrowest.services.search.OrderSearchCriteria;
+import com.metrowest.services.search.OrderSearchService;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -26,14 +29,17 @@ public class CustomerController
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
     private final OrderRepository orderRepository;
+    private final OrderSearchService orderSearchService;
 
     public CustomerController(UserRepository userRepository,
                               ProductRepository productRepository,
-                              OrderRepository orderRepository)
+                              OrderRepository orderRepository,
+                              OrderSearchService orderSearchService)
     {
         this.userRepository = userRepository;
         this.productRepository = productRepository;
         this.orderRepository = orderRepository;
+        this.orderSearchService = orderSearchService;
     }
 
     private List<OrderEntry> convert_items(Order order, Map<String, String> items)
@@ -105,6 +111,39 @@ public class CustomerController
         }
         model.addAttribute("user", user.get());
         return "customer/info";
+    }
+
+    // Search a customer's past orders by product name.
+    @GetMapping("/orders/search")
+    public String searchOrders(Model model, Authentication authentication, @RequestParam("q") String q)
+    {
+        var user = userRepository.findByUsername(authentication.getName());
+        if (user.isEmpty())
+        {
+            model.addAttribute("error", "user not found: " + authentication.getName());
+            return "error";
+        }
+
+        var criteria = new OrderSearchCriteria(q);
+        List<Order> orders = orderSearchService.search(criteria, user.get().getId());
+
+        model.addAttribute("orders", orders);
+        model.addAttribute("query", q);
+        return "customer/search_results";
+    }
+
+    // Show the details of a single order.
+    @GetMapping("/order/{id}")
+    public String viewOrder(Model model, Authentication authentication, @PathVariable("id") Long id)
+    {
+        var order = orderRepository.findById(id);
+        if (order.isEmpty())
+        {
+            model.addAttribute("error", "order not found: " + id);
+            return "error";
+        }
+        model.addAttribute("order", order.get());
+        return "customer/order";
     }
 
     @GetMapping("/dashboard")

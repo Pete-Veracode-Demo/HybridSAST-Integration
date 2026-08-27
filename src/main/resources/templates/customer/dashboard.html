@@ -55,6 +55,12 @@
 
 
 
+<h2>Search Orders</h2>
+<form method="get" th:action="@{/customer/orders/search}">
+    <input type="text" name="q" placeholder="Search by product name...">
+    <input type="submit" value="Search">
+</form>
+
 <h2>Orders</h2>
 <table>
     <thead>
