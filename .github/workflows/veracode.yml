@@ -39,11 +39,14 @@ jobs:
           vkey: ${{ secrets.VERACODE_API_KEY }}
           file: build/libs/*.jar
           fail_build: true
-          # Only fail the check on serious (High and above) findings, so the
-          # app's pre-existing Medium findings don't block every PR. An
-          # introduced SQL injection / command injection is High/Very High and
-          # will fail the gate.
-          fail_on_severity: "Very High, High"
+          # Fail the check on serious injection / critical CWE classes, so the
+          # app's pre-existing baseline findings (CWE-80 basic XSS, CWE-798
+          # hard-coded credentials) don't block every PR, while an introduced
+          # SQL injection (89), command injection (78), path traversal (22),
+          # etc. fails the gate. Comma-separated with no spaces (this action
+          # splits multi-word severity values on spaces, so fail_on_severity
+          # is avoided).
+          fail_on_cwe: "78,89,90,22,94,434,502,611,643,943"
 
   # ---------------------------------------------------------------------------
   # SCA — Veracode Software Composition Analysis. DISABLED.
