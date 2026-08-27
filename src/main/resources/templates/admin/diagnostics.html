@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang='en'>
+<head>
+    <title>MetroWest HVAC Systems, Inc.</title>
+</head>
+<body>
+<h1>Network Diagnostics</h1>
+<p>Run a connectivity check against a customer site host.</p>
+
+<form method="get" th:action="@{/admin/diagnostics}">
+    <input type="text" name="host" placeholder="hostname or IP" th:value="${host}">
+    <input type="submit" value="Run check">
+</form>
+
+<div th:if="${result}">
+    <h2>Result for <span th:text="${host}"></span></h2>
+    <pre th:text="${result}"></pre>
+</div>
+</body>
+</html>

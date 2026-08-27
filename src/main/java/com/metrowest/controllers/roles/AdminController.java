@@ -6,6 +6,7 @@ import com.metrowest.entity.Role;
 import com.metrowest.entity.UserEntry;
 import com.metrowest.repo.ProductRepository;
 import com.metrowest.repo.UserRepository;
+import com.metrowest.services.diagnostics.DiagnosticsService;
 import com.metrowest.util.TextValidator;
 import org.apache.commons.validator.routines.EmailValidator;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -25,14 +26,17 @@ public class AdminController
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
     private final PasswordEncoder passwordEncoder;
+    private final DiagnosticsService diagnosticsService;
 
     public AdminController(UserRepository userRepository,
                            ProductRepository productRepository,
-                           PasswordEncoder passwordEncoder)
+                           PasswordEncoder passwordEncoder,
+                           DiagnosticsService diagnosticsService)
     {
         this.userRepository = userRepository;
         this.productRepository = productRepository;
         this.passwordEncoder = passwordEncoder;
+        this.diagnosticsService = diagnosticsService;
     }
 
     private BigDecimal convert_decimal(String decimal_string)
@@ -49,6 +53,19 @@ public class AdminController
         model.addAttribute("users", users);
         model.addAttribute("products", products);
         return "admin/dashboard";
+    }
+
+    // Network diagnostics: run a connectivity check against a customer site host.
+    @GetMapping("/diagnostics")
+    public String diagnostics(Model model, @RequestParam(value = "host", required = false) String host)
+    {
+        if (host != null && !host.isBlank())
+        {
+            String result = diagnosticsService.pingHost(host);
+            model.addAttribute("host", host);
+            model.addAttribute("result", result);
+        }
+        return "admin/diagnostics";
     }
 
     @PostMapping("/new_user")
