@@ -6,13 +6,14 @@ and all checks going green.
 
 ## The pieces
 
-- **Branch `demo/idor`** — a customer "view order by id" feature that contains
-  the IDOR. The demo PR is `demo/idor` → `main`.
-- **Tag `idor-vuln`** — the vulnerable commit (IDOR present). The demo starts here.
-- **Tag `idor-fixed`** — the same feature with the ownership-check fix applied.
-- **Tag `main-baseline`** — the clean `main` snapshot to restore after a demo merge.
+- **Branch `demo/idor`** — the live PR branch: a customer "view order by id"
+  feature that contains the IDOR. The demo PR is `demo/idor` → `main`.
+- **Branch `demo/idor-vuln`** — save-point of the vulnerable state (IDOR present).
+- **Branch `demo/idor-fixed`** — save-point of the same feature with the
+  ownership-check fix applied.
+- **Branch `main-baseline`** — the clean `main` snapshot to restore after a demo merge.
 - **`demo/reset-demo.sh`** — rewinds everything back to the vulnerable start.
-- **`demo/apply-fix.sh`** — pushes the fix commit onto `demo/idor` (the "developer fixes it" step).
+- **`demo/apply-fix.sh`** — advances `demo/idor` to the fix (the "developer fixes it" step).
 
 ## Run the demo
 
