@@ -60,6 +60,7 @@
     <thead>
     <tr>
         <th>ID</th>
+        <th>Details</th>
 <!--        <th>Name</th>-->
 <!--        <th>Type</th>-->
 <!--        <th>Price</th>-->
@@ -68,6 +69,7 @@
     <tbody>
     <tr th:each="order : ${orders}">
         <td th:text="${order.id}"></td>
+        <td><a th:href="@{'/customer/order/' + ${order.id}}">view</a></td>
 <!--        <td th:text="${product.name}"></td>-->
 <!--        <td th:text="${product.type}"></td>-->
 <!--        <td th:text="${product.price}"></td>-->
