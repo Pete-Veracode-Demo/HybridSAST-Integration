@@ -37,12 +37,12 @@ jobs:
 
       # Call the Veracode pipeline scanner JAR directly rather than via
       # veracode/Veracode-pipeline-scan-action: that action mishandles the
-      # fail_on_severity value (it splits "Very High, High" on spaces and the
-      # scan crashes) and ignores fail_on_cwe. Invoking the JAR ourselves lets
-      # us pass -fs "Very High, High" correctly, so the app's pre-existing
-      # Medium findings don't fail the gate but an introduced High/Very High
-      # vuln (e.g. SQL injection, command injection) does. The scanner exits
-      # non-zero when a finding meets the fail criteria, which fails the job.
+      # fail_on_severity value (it splits the multi-word value on spaces and
+      # the scan crashes) and ignores fail_on_cwe. Invoking the JAR ourselves
+      # lets us pass -fs correctly. We fail on Medium and above so the app's
+      # findings (the Medium XSS and hard-coded credentials, plus any
+      # introduced High/Very High injection) surface as a failing check.
+      # The scanner exits non-zero when a finding meets the fail criteria.
       - name: Run Veracode Static Analysis Pipeline Scan
         env:
           VERACODE_API_ID: ${{ secrets.VERACODE_API_ID }}
@@ -61,7 +61,7 @@ jobs:
             -vid "$VID" \
             -vkey "$VKEY" \
             -f "$JAR" \
-            -fs "Very High, High"
+            -fs "Very High, High, Medium"
 
   # ---------------------------------------------------------------------------
   # SCA — Veracode Software Composition Analysis. DISABLED.
