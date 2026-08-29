@@ -108,12 +108,20 @@ public class CustomerController
         return "customer/info";
     }
 
-    // Show the details of a single order.
+    // Show the details of a single order. Only the customer who owns the order
+    // may view it.
     @GetMapping("/order/{id}")
     public String viewOrder(Model model, Authentication authentication, @PathVariable("id") Long id)
     {
+        var user = userRepository.findByUsername(authentication.getName());
+        if (user.isEmpty())
+        {
+            model.addAttribute("error", "user not found: " + authentication.getName());
+            return "error";
+        }
+
         var order = orderRepository.findById(id);
-        if (order.isEmpty())
+        if (order.isEmpty() || !order.get().getCustomer().getId().equals(user.get().getId()))
         {
             model.addAttribute("error", "order not found: " + id);
             return "error";
