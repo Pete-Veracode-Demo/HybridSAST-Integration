@@ -191,7 +191,6 @@ public class UtilController
         response.put("username", user.getUsername());
         response.put("email", user.getEmail());
         response.put("role", user.getRole().name());
-        response.put("createdAt", user.getCreatedAt());
 
         return ResponseEntity.ok(response);
     }
