@@ -15,6 +15,21 @@ and all checks going green.
 - **`demo/reset-demo.sh`** — rewinds everything back to the vulnerable start.
 - **`demo/apply-fix.sh`** — advances `demo/idor` to the fix (the "developer fixes it" step).
 
+## Branches in this repo
+
+These are the **only** branches that should exist. If you see others, they're
+stale experiments and safe to delete.
+
+| Branch | Keep because |
+|---|---|
+| `main` | trunk |
+| `main-baseline` | demo reset save-point (`reset-demo.sh` restores `main` from it) |
+| `demo/idor` | the live demo PR branch |
+| `demo/idor-vuln` | save-point: vulnerable state |
+| `demo/idor-fixed` | save-point: fixed state |
+| `test_2` | separate vuln-set PR (#37) — SQLi/XXE/crypto findings |
+| `claude/test-app-idor-vuln-y8drd4` | assigned dev branch |
+
 ## Run the demo
 
 1. **Reset to the vulnerable start** (do this before each run):
