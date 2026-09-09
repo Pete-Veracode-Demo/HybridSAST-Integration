@@ -30,6 +30,20 @@ stale experiments and safe to delete.
 | `test_2` | separate vuln-set PR (#37) — SQLi/XXE/crypto findings |
 | `claude/test-app-idor-vuln-y8drd4` | assigned dev branch |
 
+## Quick start (the easy way)
+
+One command with three verbs, run from the repo root:
+
+```
+./demo.sh reset     # back to the vulnerable start (before each run)
+./demo.sh fix       # "the developer fixes it" — checks go green
+./demo.sh status    # show the current state + the PR link
+```
+
+Typical run: `./demo.sh reset` → show the PR → `./demo.sh fix` → merge.
+Each command prints what to do next, so you don't have to remember the steps.
+The detailed version of those steps is below.
+
 ## Run the demo
 
 1. **Reset to the vulnerable start** (do this before each run):
