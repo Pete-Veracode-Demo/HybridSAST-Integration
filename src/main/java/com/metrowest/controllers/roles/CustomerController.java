@@ -11,6 +11,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -105,6 +106,20 @@ public class CustomerController
         }
         model.addAttribute("user", user.get());
         return "customer/info";
+    }
+
+    // Show the details of a single order.
+    @GetMapping("/order/{id}")
+    public String viewOrder(Model model, Authentication authentication, @PathVariable("id") Long id)
+    {
+        var order = orderRepository.findById(id);
+        if (order.isEmpty())
+        {
+            model.addAttribute("error", "order not found: " + id);
+            return "error";
+        }
+        model.addAttribute("order", order.get());
+        return "customer/order";
     }
 
     @GetMapping("/dashboard")
