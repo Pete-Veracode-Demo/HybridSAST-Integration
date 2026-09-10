@@ -127,7 +127,7 @@ Two independent reasons, not one:
    reason about exactly that class.
 2. **The org Veracode check applies a policy filter.** With
    `Veracode Recommended Medium + SCA` it reports only High and Very High
-   findings, so the check shows 2 violations while the raw scan has ~11. The
+   findings, so the check shows 2 violations while the raw scan has 12 (1 Very High, 1 High, 10 Medium). The
    Mediums (path traversal, XXE, MD5, deserialization, trust-all TLS, XSS) are
    in the raw results and on the platform, just not gating.
 
