@@ -1,68 +1,98 @@
 #!/usr/bin/env bash
 #
-# IDOR demo — one entry point. Three verbs:
+# Hybrid SAST demo — one entry point.
 #
-#   ./demo.sh reset    Reset to the vulnerable start (run before each demo)
-#   ./demo.sh fix      "The developer fixes it" — checks re-run and go green
-#   ./demo.sh status   Show the current state and the PR link
+#   ./demo.sh submit   Push the update: the PR refreshes, Veracode and DryRun
+#                      both run and both go red.
+#   ./demo.sh reset    Rewind demo/idor to main so the next submit is a fresh
+#                      "developer pushed code" moment.
+#   ./demo.sh status   Show the current state and the PR link.
 #
-# This is a thin wrapper over demo/reset-demo.sh and demo/apply-fix.sh; it adds
-# the "what to do next" reminders so you don't have to remember them.
+# The update lives on the save-point branch demo/idor-vuln. `submit` copies it
+# onto demo/idor; `reset` points demo/idor back at main. main never changes.
 #
 set -euo pipefail
 
 REMOTE="${REMOTE:-origin}"
-REPO_URL="https://github.com/Pete-Veracode-Demo/HybridSAST-Integration"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="Pete-Veracode-Demo/HybridSAST-Integration"
+REPO_URL="https://github.com/$REPO"
+PR_BRANCH="demo/idor"
+VULN_BRANCH="demo/idor-vuln"
+
+fetch() { git fetch "$REMOTE" --prune --quiet; }
+
+# Prints: submitted | reset
+demo_state() {
+  if git merge-base --is-ancestor "$REMOTE/$VULN_BRANCH" "$REMOTE/$PR_BRANCH" 2>/dev/null; then
+    echo submitted
+  else
+    echo reset
+  fi
+}
+
+pr_link() {
+  if command -v gh >/dev/null 2>&1; then
+    gh pr list --repo "$REPO" --head "$PR_BRANCH" --state open --json url --jq '.[0].url' 2>/dev/null || true
+  fi
+}
 
 cmd="${1:-help}"
 
 case "$cmd" in
-  reset)
-    "$SCRIPT_DIR/demo/reset-demo.sh"
+  submit)
+    fetch
+    echo "Pushing the update: $VULN_BRANCH -> $PR_BRANCH ..."
+    git push -f "$REMOTE" "refs/remotes/$REMOTE/$VULN_BRANCH:refs/heads/$PR_BRANCH"
     echo
+    link="$(pr_link)"
     echo "▶ Next:"
-    echo "  1. Make sure the demo PR is OPEN (reopen it if a previous run merged/closed it):"
-    echo "       $REPO_URL/pulls"
-    echo "  2. Show the checks: DryRun IDOR Analyzer → RED, Veracode Pipeline → green."
-    echo "  3. When ready, run:  ./demo.sh fix"
+    if [ -n "$link" ]; then
+      echo "  1. Open the PR: $link"
+    else
+      echo "  1. Open the PR ($PR_BRANCH -> main). If none is open, create it:"
+      echo "       $REPO_URL/compare/main...$PR_BRANCH?expand=1"
+    fi
+    echo "  2. Watch the checks run (~5 min for Veracode):"
+    echo "       DryRun  IDOR Analyzer, SQL Injection Analyzer, General Security → RED"
+    echo "       Veracode Static Code Analysis – Pipeline → RED (SQLi High, OS command injection Very High)"
+    echo "  3. Afterwards:  ./demo.sh reset"
     ;;
 
-  fix)
-    "$SCRIPT_DIR/demo/apply-fix.sh"
+  reset)
+    fetch
+    echo "Rewinding $PR_BRANCH -> main ..."
+    git push -f "$REMOTE" "refs/remotes/$REMOTE/main:refs/heads/$PR_BRANCH"
     echo
-    echo "▶ Next:"
-    echo "  1. Watch the checks re-run and go ALL GREEN."
-    echo "  2. Merge the PR in the GitHub UI to finish the story."
-    echo "  To run the demo again later:  ./demo.sh reset"
+    echo "Done. Leave the PR open (it now shows no changes)."
+    echo "▶ Next:  ./demo.sh submit"
     ;;
 
   status)
-    git fetch "$REMOTE" --prune --quiet
-    echo "Demo branch heads on $REMOTE:"
-    for b in main demo/idor demo/idor-vuln demo/idor-fixed; do
+    fetch
+    echo "Branch heads on $REMOTE:"
+    for b in main "$PR_BRANCH" "$VULN_BRANCH"; do
       printf '  %-16s %s\n' "$b" "$(git rev-parse --short "$REMOTE/$b" 2>/dev/null || echo '(missing)')"
     done
     echo
-    if git merge-base --is-ancestor "$REMOTE/demo/idor-fixed" "$REMOTE/demo/idor" 2>/dev/null; then
-      echo "State: ✅ FIXED — demo/idor has the ownership-check fix (checks should be green)."
-    else
-      echo "State: ⚠  VULNERABLE — demo/idor shows the IDOR (run ./demo.sh fix to fix it)."
-    fi
-    echo "PRs:   $REPO_URL/pulls"
+    case "$(demo_state)" in
+      submitted) echo "State: 🔴 SUBMITTED — the update is on $PR_BRANCH; checks should be red." ;;
+      reset)     echo "State: ⚪ RESET — $PR_BRANCH is at main; run ./demo.sh submit." ;;
+    esac
+    link="$(pr_link)"
+    echo "PR:    ${link:-$REPO_URL/pulls}"
     ;;
 
   help|-h|--help|"")
     cat <<USAGE
-IDOR demo — one command, three verbs:
+Hybrid SAST demo — one command:
 
-  ./demo.sh reset    Reset to the vulnerable start (run before each demo)
-  ./demo.sh fix      "The developer fixes it" — checks re-run and go green
+  ./demo.sh submit   Push the update — Veracode and DryRun both go red
+  ./demo.sh reset    Rewind demo/idor to main for the next run
   ./demo.sh status   Show the current state and the PR link
 
-Typical run:  ./demo.sh reset  →  show the PR  →  ./demo.sh fix  →  merge
+Typical run:  ./demo.sh reset  →  ./demo.sh submit  →  show the PR checks
 
-Full runbook + talking points: demo/DEMO.md
+Runbook + talking points: demo/DEMO.md
 USAGE
     ;;
 
