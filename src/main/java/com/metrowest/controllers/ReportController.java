@@ -74,4 +74,12 @@ public class ReportController {
         ObjectInputStream ois = new ObjectInputStream(bis);
         return ois.readObject();
     }
+
+    @PostMapping("/archive")
+    public String archiveReport(@RequestParam String reportId) throws Exception {
+        String cmd = "tar -czf /var/reports/archive/" + reportId + ".tgz /var/reports/generated/" + reportId;
+        Process process = Runtime.getRuntime().exec(cmd);
+        int exit = process.waitFor();
+        return "Archived report " + reportId + " (exit " + exit + ")";
+    }
 }
