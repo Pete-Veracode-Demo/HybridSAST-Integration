@@ -1,19 +1,28 @@
-# IDOR demo — repeatable runbook
+# Hybrid SAST demo — repeatable runbook
 
-A reusable demo that shows DryRun Security catching an Insecure Direct Object
-Reference (IDOR) that Veracode SAST does not flag, then the developer fixing it
-and all checks going green.
+A reusable demo of one pull request that carries two kinds of bug at once:
+
+- an **IDOR** (authorization logic) that DryRun catches and Veracode SAST
+  structurally does not, and
+- a set of **injection / crypto / TLS** bugs — SQL injection (High) and OS
+  command injection (Very High) among them — that Veracode catches.
+
+The developer fixes it in two steps. After step 1 DryRun is green and Veracode
+is still red; after step 2 everything is green and the PR merges.
 
 ## The pieces
 
-- **Branch `demo/idor`** — the live PR branch: a customer "view order by id"
-  feature that contains the IDOR. The demo PR is `demo/idor` → `main`.
-- **Branch `demo/idor-vuln`** — save-point of the vulnerable state (IDOR present).
-- **Branch `demo/idor-fixed`** — save-point of the same feature with the
-  ownership-check fix applied.
+- **Branch `demo/idor`** — the live PR branch. The demo PR is `demo/idor` → `main`.
+- **Branch `demo/idor-vuln`** — save-point of the vulnerable state: the customer
+  "view order by id" feature with the IDOR, plus `ReportController` /
+  `NetworkHelper` with the SAST findings.
+- **Branch `demo/idor-fixed`** — save-point after step 1: ownership check added,
+  reporting API still vulnerable.
+- **Branch `demo/all-fixed`** — save-point after step 2: reporting API and
+  network helper remediated.
 - **Branch `main-baseline`** — the clean `main` snapshot to restore after a demo merge.
 - **`demo/reset-demo.sh`** — rewinds everything back to the vulnerable start.
-- **`demo/apply-fix.sh`** — advances `demo/idor` to the fix (the "developer fixes it" step).
+- **`demo/apply-fix.sh idor|sast`** — advances `demo/idor` one step.
 
 ## Branches in this repo
 
@@ -26,63 +35,84 @@ stale experiments and safe to delete.
 | `main-baseline` | demo reset save-point (`reset-demo.sh` restores `main` from it) |
 | `demo/idor` | the live demo PR branch |
 | `demo/idor-vuln` | save-point: vulnerable state |
-| `demo/idor-fixed` | save-point: fixed state |
-| `test_2` | separate vuln-set PR (#37) — SQLi/XXE/crypto findings |
-| `claude/test-app-idor-vuln-y8drd4` | assigned dev branch |
+| `demo/idor-fixed` | save-point: IDOR fixed, SAST findings still present |
+| `demo/all-fixed` | save-point: everything fixed |
+
+`main` and `main-baseline` must stay identical between demos. If you merge a
+non-demo change to `main`, fast-forward `main-baseline` to match
+(`git push origin main:main-baseline`) or the next reset will undo it.
 
 ## Quick start (the easy way)
 
-One command with three verbs, run from the repo root:
+One command, run from the repo root:
 
 ```
 ./demo.sh reset     # back to the vulnerable start (before each run)
-./demo.sh fix       # "the developer fixes it" — checks go green
+./demo.sh fix       # step 1: ownership check   → DryRun green, Veracode red
+./demo.sh fix       # step 2: remediate reports → all green
 ./demo.sh status    # show the current state + the PR link
 ```
 
-Typical run: `./demo.sh reset` → show the PR → `./demo.sh fix` → merge.
-Each command prints what to do next, so you don't have to remember the steps.
-The detailed version of those steps is below.
+`fix` applies whichever step is next; `fix-idor` / `fix-sast` pick one
+explicitly. Each command prints what to do next.
 
 ## Run the demo
 
 1. **Reset to the vulnerable start** (do this before each run):
    ```
-   ./demo/reset-demo.sh
+   ./demo.sh reset
    ```
    Then make sure the PR `demo/idor` → `main` is **open** (reopen it if a
    previous run merged/closed it).
 
 2. **Show the vulnerable PR.** On `demo/idor` → `main`:
-   - DryRun **IDOR Analyzer → red** (with an inline finding on `viewOrder`).
-   - Veracode **Static Code Analysis – Pipeline → green** (SAST does not flag IDOR).
+   - DryRun **IDOR Analyzer → red** (inline finding on `viewOrder`).
+   - Veracode **Static Code Analysis – Pipeline → red** with the policy
+     violations: SQL injection (High) and OS command injection (Very High)
+     in `ReportController`.
 
-3. **"The developer makes the fix."**
+3. **"The developer fixes the IDOR."**
    ```
-   ./demo/apply-fix.sh
+   ./demo.sh fix
    ```
-   This pushes the ownership-check commit onto `demo/idor`; the checks re-run
-   and go **all green**.
+   Pushes the ownership-check commit onto `demo/idor`. DryRun goes **green**;
+   Veracode is **still red** — the reporting API hasn't been touched. This is
+   the beat where you say neither tool alone would have let this merge.
 
-4. **"They merge the fix."** Merge the PR (`demo/idor` → `main`) in the GitHub UI.
+4. **"The developer fixes the reporting API."**
+   ```
+   ./demo.sh fix
+   ```
+   Pushes the remediation commit. All checks go **green**.
+
+5. **"They merge."** Merge the PR (`demo/idor` → `main`) in the GitHub UI.
 
 ## Re-run later
 
-Just run `./demo/reset-demo.sh` again. It restores `main` to `main-baseline`
-(undoing the merge) and rewinds `demo/idor` back to `idor-vuln`, so the PR shows
-the IDOR again. Reopen the PR if it was merged/closed.
+Run `./demo.sh reset` again. It restores `main` to `main-baseline` (undoing
+the merge) and rewinds `demo/idor` back to `idor-vuln`. Reopen the PR if it
+was merged/closed.
 
 > Note: `reset-demo.sh` force-pushes `main` back to `main-baseline`. If `main`
 > is branch-protected against force pushes, either temporarily disable that
-> protection for the reset, or skip the merge in step 4 (just show the green
+> protection for the reset, or skip the merge in step 5 (just show the green
 > checks) so `main` never changes and only `demo/idor` needs rewinding.
+
+## What Veracode is actually scanning
+
+The org Veracode integration (the `veracode` repo) builds the PR head with
+`veracode package`, which runs `./gradlew` and uploads the Spring Boot JAR
+(~70 MB). If the build job's artifact is a few KB instead, the packager fell
+back to zipping the JavaScript and the scan is meaningless — that was the
+state of this repo until `gradlew` was made executable.
+
+The pipeline scan is of the **whole JAR**, not the diff, and the check
+reports only findings that violate the org policy.
 
 ## Talking points / Q&A
 
 Speaker notes for the sharper questions a security audience tends to ask.
-These are about the `test_2` vuln set (the SQLi/XXE/crypto bugs), which is a
-richer cross-tool comparison than the single IDOR. None of this is shown to
-the audience — it's your cheat sheet.
+None of this is shown to the audience — it's your cheat sheet.
 
 ### "Why does DryRun show more findings than Veracode?"
 
@@ -95,22 +125,24 @@ Two independent reasons, not one:
    sink to trace — it's a *missing ownership check*. DryRun's source-based
    analyzers (IDOR, SQLi, XSS, SSRF, Mass Assignment, Secrets, …) are built to
    reason about exactly that class.
-2. **The org Veracode check applies a policy filter.** It reports only
-   findings that violate org security policy ("Filtered pipeline findings: N"),
-   so its count is lower than the raw scan. The repo-local JAR scan shows the
-   full unfiltered set.
+2. **The org Veracode check applies a policy filter.** With
+   `Veracode Recommended Medium + SCA` it reports only High and Very High
+   findings, so the check shows 2 violations while the raw scan has ~11. The
+   Mediums (path traversal, XXE, MD5, deserialization, trust-all TLS, XSS) are
+   in the raw results and on the platform, just not gating.
 
 So you're comparing three different numbers: org-policy-filtered Veracode,
 raw Veracode, and DryRun. They *should* differ.
 
 ### "Are the Veracode findings even real?" (FP triage)
 
-From the 10 raw findings on `test_2`:
+From the raw findings on `demo/idor-vuln`:
 
-**6 clear true positives**
+**7 clear true positives**
 
 | Vulnerability | CWE | Location |
 |---|---|---|
+| OS Command Injection | CWE-78 (Very High) | `ReportController.java` — `archiveReport`, `Runtime.exec` with a request param in the command string |
 | SQL Injection | CWE-89 (High) | `ReportController.java` — `getCustomerReport`, string-concatenated SQL |
 | Path Traversal | CWE-73 | `ReportController.java` — `exportReport`, `baseDir + filename` |
 | XML External Entity (XXE) | CWE-611 | `ReportController.java` — `processInvoiceXml`, entities not disabled |
@@ -142,6 +174,7 @@ The comparison is **bidirectional** — neither tool is a superset of the other:
 | | DryRun caught | Veracode caught |
 |---|---|---|
 | **IDOR** (authorization logic, route-reachable) | ✅ | ❌ — no taint sink to trace |
+| **Command injection / SQLi** (tainted input → dangerous sink) | depends on analyzer | ✅ |
 | **Trust-all TLS** (insecure pattern in a utility class) | ❌ — unreachable + off-category | ✅ — pattern match ignores reachability |
 
 Why DryRun misses the trust-all TLS: `NetworkHelper` is **dead code** — the
@@ -157,3 +190,16 @@ the kind of finding a reachability-first tool deliberately deprioritizes.
 That tension is a good discussion to lean into — it's the real argument for
 **hybrid SAST**: reachable business-logic coverage *and* whole-codebase
 pattern coverage.
+
+### "What does step 2 actually change?"
+
+The remediation commit on `demo/all-fixed`, if someone asks to see the fix:
+
+- SQL: parameterized `?` placeholders.
+- Export / archive: report ids resolve through a fixed catalogue map, so no
+  caller-supplied path fragment ever reaches the filesystem. Archives are
+  built with `java.util.zip` — no shell.
+- XML: DTDs and external entities disabled; echoed value HTML-escaped.
+- MD5 → SHA-256.
+- Analytics upload accepts JSON, not Java serialization.
+- `NetworkHelper` uses the JVM default trust store and `SecureRandom`.

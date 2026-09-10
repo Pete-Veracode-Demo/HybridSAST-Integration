@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 #
-# Reset the IDOR demo back to its vulnerable starting state.
+# Reset the demo back to its vulnerable starting state.
 #
 #   - restores `main` to the `main-baseline` branch (undoes a demo merge)
-#   - rewinds `demo/idor` back to the `demo/idor-vuln` branch (IDOR visible again)
+#   - rewinds `demo/idor` back to the `demo/idor-vuln` branch (IDOR and the
+#     reporting-API vulns visible again)
 #
 # After running, reopen the PR (demo/idor -> main) if a previous run merged
 # or closed it.
